@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Proxy</title>
+    <link rel="stylesheet" type="text/css" media="screen" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="http://zeptojs.com/zepto.min.js"></script>
+    <style>
+        #overlay{
+            z-index: 1;
+            height: 100%;
+            position: fixed;
+            right: 0;
+            background: #FFF;
+            border-left: 1px solid #CCC;
+            top: 0;
+            padding: 10px 20px 10px 10px;
+            overflow-y:auto;
+            box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+        }
+
+        #esc{
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            color: #777;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        pre {
+            white-space: pre-wrap;      
+            white-space: -moz-pre-wrap; 
+            white-space: -o-pre-wrap;  
+            word-wrap: break-word;    
+        }
+    </style>
+    <script type="text/javascript">
+        var Base64 = {
+            _keyStr : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+            decode : function (input) {
+                var output = "";
+                var chr1, chr2, chr3;
+                var enc1, enc2, enc3, enc4;
+                var i = 0;
+                input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
+                while (i < input.length) {
+                    enc1 = this._keyStr.indexOf(input.charAt(i++));
+                    enc2 = this._keyStr.indexOf(input.charAt(i++));
+                    enc3 = this._keyStr.indexOf(input.charAt(i++));
+                    enc4 = this._keyStr.indexOf(input.charAt(i++));
+                    chr1 = (enc1 << 2) | (enc2 >> 4);
+                    chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+                    chr3 = ((enc3 & 3) << 6) | enc4;
+                    output = output + String.fromCharCode(chr1);
+                    if (enc3 != 64) {
+                        output = output + String.fromCharCode(chr2);
+                    }
+                    if (enc4 != 64) {
+                        output = output + String.fromCharCode(chr3);
+                    }
+                }
+                output = Base64._utf8_decode(output);
+                return output;
+            },
+            _utf8_decode : function (utftext) {
+                var string = "";
+                var i = 0;
+                var c = c1 = c2 = 0;
+                while ( i < utftext.length ) {
+                    c = utftext.charCodeAt(i);
+                    if (c < 128) {
+                        string += String.fromCharCode(c);
+                        i++;
+                    } else if((c > 191) && (c < 224)) {
+                        c2 = utftext.charCodeAt(i+1);
+                        string += String.fromCharCode(((c & 31) << 6) | (c2 & 63));
+                        i += 2;
+                    } else {
+                        c2 = utftext.charCodeAt(i+1);
+                        c3 = utftext.charCodeAt(i+2);
+                        string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));
+                        i += 3;
+                    }
+                }
+                return string;
+            }
+        };
+
+        window.onload = function () {
+            var conn;
+            var msg = document.getElementById("msg");
+            var log = document.getElementById("log");
+            var index = 1;
+            function appendLog(item) {
+                var message = JSON.parse(item);
+                var tr = document.createElement('tr');
+                tr.innerHTML = "<td><a class='detail' href='javascript:void(\"0\");' data-value='" + item + "'>" + index + "</a></td></td><td>" + message.Method + "</td><td>" + message.Code + "</td>" +
+                        "<td>" + message.Host + "</td><td>" + message.Path + "</td><td>" + message.Mime_type + "</td>" +
+                        "<td>" + Math.round(message.CostTime / 1000000) + "ms</td>";
+                log.appendChild(tr);
+            }
+            if (window["WebSocket"]) {
+                conn = new WebSocket("ws://{{$}}/ws");
+                conn.onclose = function (evt) {
+                    var item = document.createElement("div");
+                    item.innerHTML = "<b>Connection closed.</b>";
+                    appendLog(item);
+                };
+                conn.onmessage = function (evt) {
+                    var messages = evt.data.split('\n');
+                    for (var i = 0; i < messages.length; i++) {
+                        appendLog(messages[i]);
+                        index++;
+                    }
+                };
+            } else {
+                var item = document.createElement("div");
+                item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+                appendLog(item);
+            }
+        };
+    </script>
+</head>
+<body>
+<div id="app" style="margin: 10px;">
+    <div class="row">
+        <div class="col-lg-12">
+            <table class="table table-hover table-striped table-bordered table-condensed" style="overflow: scroll;">
+                <thead>
+                <tr>
+                    <th>Index</th>
+                    <th>Method</th>
+                    <th>Code</th>
+                    <th>Host</th>
+                    <th>Path</th>
+                    <th>Mime</th>
+                    <th>Cost</th>
+                </tr>
+                </thead>
+                <tbody id="log"></tbody>
+            </table>
+        </div>
+
+        <div id="overlay" style="left:35%;display: none">
+            <span id="esc">X</span>
+            <pre id="detail"></pre>
+        </div>
+    </div>
+</div>
+<script>
+        $("#log").on('click', ".detail", function(){
+            var msg = JSON.parse($(this).attr('data-value'));
+            $("#detail").text(Base64.decode(msg.Req) + "\n" + Base64.decode(msg.Resp));
+            $("#overlay").show();
+        });
+
+        $("#esc").click(function(){
+            $("#overlay").hide();
+        })
+</script>
+</body>
+</html>
